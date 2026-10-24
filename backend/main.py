@@ -29,6 +29,13 @@ class AlunoDB(Base):
     
     aulas = relationship("AulaDB", secondary=inscricoes_tabela, back_populates="alunos_inscritos")
 
+class PlanoDB(Base):
+    __tablename__ = "planos"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, unique=True, index=True)
+    valor = Column(String)
+    descricao = Column(String)
+
 class AulaDB(Base):
     __tablename__ = "aulas"
     id = Column(Integer, primary_key=True, index=True)
@@ -82,6 +89,21 @@ class NovoAlunoSchema(BaseModel):
     status_pagamento: str = "Quitado"
     vencimento_plano: str = "2026-12-31"
 
+class AtualizarAlunoSchema(BaseModel):
+    nome: str
+    email: str
+    plano: str
+    status_pagamento: str
+    vencimento_plano: str
+
+class PlanoSchema(BaseModel):
+    id: int
+    nome: str
+    valor: str
+    descricao: str
+    class Config:
+        from_attributes = True
+
 class AulaSchema(BaseModel):
     id: int
     nome: str
@@ -106,6 +128,12 @@ def popular_dados_iniciais():
             AlunoDB(id=1, usuario="aluno1", nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação", status_pagamento="Quitado", vencimento_plano="2026-06-30"),
             AlunoDB(id=2, usuario="aluno2", nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo", status_pagamento="Pendente", vencimento_plano="2025-12-01"),
             AlunoDB(id=3, usuario="aluno3", nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross", status_pagamento="Quitado", vencimento_plano="2026-11-15")
+        ])
+    if db.query(PlanoDB).count() == 0:
+        db.add_all([
+            PlanoDB(id=1, nome="Mensal - Musculação", valor="R$ 100,00", descricao="Acesso livre à musculação por 30 dias"),
+            PlanoDB(id=2, nome="Trimestral - Cross", valor="R$ 270,00", descricao="Acesso ao CrossFit e Musculação"),
+            PlanoDB(id=3, nome="Anual - Completo", valor="R$ 960,00", descricao="Acesso total a todas as modalidades e áreas")
         ])
     if db.query(AulaDB).count() == 0:
         db.add_all([
@@ -168,12 +196,32 @@ def cadastrar_aluno(aluno: NovoAlunoSchema, db: Session = Depends(get_db)):
     db.refresh(novo)
     return novo
 
+@app.put("/alunos/{aluno_id}", response_model=AlunoSchema)
+def atualizar_aluno(aluno_id: int, dados: AtualizarAlunoSchema, db: Session = Depends(get_db)):
+    aluno = db.query(AlunoDB).filter(AlunoDB.id == aluno_id).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    
+    aluno.nome = dados.nome
+    aluno.email = dados.email
+    aluno.plano = dados.plano
+    aluno.status_pagamento = dados.status_pagamento
+    aluno.vencimento_plano = dados.vencimento_plano
+    
+    db.commit()
+    db.refresh(aluno)
+    return aluno
+
 @app.get("/alunos/{usuario}", response_model=AlunoSchema)
 def consultar_aluno_especifico(usuario: str, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.usuario == usuario).first()
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno não encontrado.")
     return aluno
+
+@app.get("/planos", response_model=List[PlanoSchema])
+def listar_planos(db: Session = Depends(get_db)):
+    return db.query(PlanoDB).all()
 
 @app.get("/aulas")
 def listar_aulas(db: Session = Depends(get_db)):
@@ -219,7 +267,6 @@ def inscrever_aula(aula_id: int, aluno_usuario: str, db: Session = Depends(get_d
     if not aula or not aluno:
         raise HTTPException(status_code=404, detail="Aula ou Aluno não encontrados.")
     
-    # Validação financeira: Aluno inadimplente não pode se inscrever
     if aluno.status_pagamento != "Quitado":
         raise HTTPException(status_code=400, detail="Inscrição bloqueada: O aluno possui pagamento pendente ou plano vencido.")
     
