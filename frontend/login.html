@@ -2,24 +2,30 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Login - Academia</title>
+    <title>Login - Sistema de Academia</title>
     <style>
         body { font-family: Arial, sans-serif; background: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: white; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        h2 { text-align: center; color: #2c3e50; }
+        .login-card { background: white; padding: 35px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; }
         input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button { width: 100%; background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:hover { background: #219653; }
-        .erro { color: red; font-size: 14px; text-align: center; }
+        .erro { color: #e74c3c; font-size: 13px; text-align: center; margin-top: 10px; }
+        .hint { font-size: 12px; color: #7f8c8d; margin-top: 15px; text-align: center; line-height: 1.4; }
     </style>
 </head>
 <body>
     <div class="login-card">
-        <h2>🏋️ Entrar</h2>
-        <input type="text" id="usuario" placeholder="Usuário (admin)" value="admin">
+        <h2>🏋️ Academia ECOT11A</h2>
+        <input type="text" id="usuario" placeholder="Usuário (admin ou aluno)" value="admin">
         <input type="password" id="senha" placeholder="Senha (1234)" value="1234">
-        <button onclick="logar()">Acessar Sistema</button>
+        <button onclick="logar()">Entrar</button>
         <p id="msg-erro" class="erro"></p>
+        <div class="hint">
+            <b>Dicas de acesso:</b><br>
+            Admin: <code>admin</code> / <code>1234</code><br>
+            Aluno: <code>aluno</code> / <code>1234</code>
+        </div>
     </div>
 
     <script>
@@ -32,13 +38,16 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ usuario, senha })
                 });
+                const data = await res.json();
                 if (res.ok) {
+                    localStorage.setItem("perfil", data.perfil);
+                    localStorage.setItem("nomeUsuario", data.nome);
                     window.location.href = "dashboard.html";
                 } else {
-                    document.getElementById("msg-erro").innerText = "Credenciais inválidas!";
+                    document.getElementById("msg-erro").innerText = data.detail;
                 }
             } catch (err) {
-                document.getElementById("msg-erro").innerText = "Erro ao conectar com o servidor.";
+                document.getElementById("msg-erro").innerText = "Erro de conexão com o servidor.";
             }
         }
     </script>
