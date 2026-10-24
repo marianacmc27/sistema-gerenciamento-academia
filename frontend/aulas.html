@@ -8,16 +8,18 @@
         nav { background: #2c3e50; padding: 15px 25px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
         nav a { color: white; text-decoration: none; margin: 0 12px; font-weight: bold; }
         nav a:hover { color: #27ae60; }
-        .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .container { max-width: 950px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         ul { list-style: none; padding: 0; }
-        li { background: #ecf0f1; margin: 10px 0; padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .acoes { display: flex; gap: 8px; }
+        li { background: #ecf0f1; margin: 12px 0; padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
         button { background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #219653; }
         .btn-cancelar { background: #e67e22; }
         .btn-cancelar:hover { background: #d35400; }
         .btn-remover { background: #e74c3c; }
         .btn-remover:hover { background: #c0392b; }
+        .btn-editar { background: #2980b9; }
+        .btn-editar:hover { background: #1f618d; }
         .lotado { background: #95a5a6; cursor: not-allowed; }
         form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #ddd; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -31,13 +33,13 @@
     </nav>
 
     <div class="container">
-        <h2 id="titulo-pagina">🏃‍♂️ Programação de Aulas</h2>
+        <h2 id="titulo-pagina">Programação de Aulas e Inscrições</h2>
 
         <div id="painel-criacao" style="display: none;">
-            <h3>Cadastrar Nova Turma (Funcionário/Admin)</h3>
+            <h3>Cadastrar Nova Turma</h3>
             <form onsubmit="criarAula(event)">
                 <div class="form-grid">
-                    <input type="number" id="aula-id" placeholder="ID da Aula (ex: 4)" required>
+                    <input type="number" id="aula-id" placeholder="ID (ex: 4)" required>
                     <input type="text" id="aula-nome" placeholder="Nome da Aula (ex: Pilates)" required>
                     <input type="text" id="aula-prof" placeholder="Nome do Professor" required>
                     <input type="text" id="aula-horario" placeholder="Horário (ex: Ter/Qui 15:00)" required>
@@ -45,9 +47,9 @@
                 </div>
                 <button type="submit">Cadastrar Turma</button>
             </form>
+            <h3>Turmas Disponíveis e Frequência</h3>
         </div>
 
-        <h3>Turmas Disponíveis</h3>
         <ul id="lista-aulas"></ul>
     </div>
 
@@ -88,10 +90,12 @@
                 let botoesHTML = "";
 
                 if (perfil === "admin") {
-                    // Admin visualiza quem está inscrito na turma
                     const nomesInscritos = a.lista_alunos.length > 0 ? a.lista_alunos.join(", ") : "Nenhum aluno inscrito";
-                    infoAlunosAdmin = `<br><small style="color: #2980b9;"><b>Alunos inscritos:</b> ${nomesInscritos}</small>`;
-                    botoesHTML = `<button class="btn-remover" onclick="removerAula(${a.id})">Remover Turma</button>`;
+                    infoAlunosAdmin = `<br><small style="color: #2980b9;"><b>Alunos Inscritos (Frequência):</b> ${nomesInscritos}</small>`;
+                    botoesHTML = `
+                        <button class="btn-editar" onclick='prepararAlteracao(${JSON.stringify(a)})'>Alterar Turma</button>
+                        <button class="btn-remover" onclick="removerAula(${a.id})">Remover</button>
+                    `;
                 } else {
                     botoesHTML = `
                         <button class="${lotado ? 'lotado' : ''}" ${lotado ? 'disabled' : ''} onclick="inscrever(${a.id})">
@@ -128,7 +132,7 @@
                 body: JSON.stringify(nova)
             });
             if (res.ok) {
-                alert("Aula cadastrada com sucesso!");
+                alert("Turma cadastrada com sucesso!");
                 carregarAulas();
                 e.target.reset();
             } else {
@@ -137,8 +141,38 @@
             }
         }
 
+        function prepararAlteracao(a) {
+            const novoNome = prompt("Alterar Nome da Aula:", a.nome);
+            if (novoNome === null) return;
+            const novoProf = prompt("Alterar Professor:", a.professor);
+            const novoHorario = prompt("Alterar Horário:", a.horario);
+            const novasVagas = prompt("Alterar Limite de Vagas:", a.vagas_maximas);
+
+            atualizarAulaAPI(a.id, {
+                id: a.id,
+                nome: novoNome,
+                professor: novoProf,
+                horario: novoHorario,
+                vagas_maximas: parseInt(novasVagas)
+            });
+        }
+
+        async function atualizarAulaAPI(id, dados) {
+            const res = await fetch(`${API}/aulas/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(dados)
+            });
+            if (res.ok) {
+                alert("Programação da aula alterada com sucesso!");
+                carregarAulas();
+            } else {
+                alert("Erro ao alterar aula.");
+            }
+        }
+
         async function removerAula(id) {
-            if (confirm("Tem certeza que deseja excluir esta turma?")) {
+            if (confirm("Deseja realmente remover esta turma?")) {
                 const res = await fetch(`${API}/aulas/${id}`, { method: "DELETE" });
                 if (res.ok) {
                     alert("Turma removida!");
