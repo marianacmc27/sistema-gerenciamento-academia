@@ -5,7 +5,6 @@ from typing import List
 
 app = FastAPI(title="Sistema de Gerenciamento de Academia", version="1.0.0")
 
-# Habilitar CORS para o frontend comunicar com o backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,7 +13,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelos de Dados (Pydantic)
+class LoginData(BaseModel):
+    usuario: str
+    senha: str
+
 class Aluno(BaseModel):
     id: int
     nome: str
@@ -27,7 +29,6 @@ class Aula(BaseModel):
     vagas_maximas: int
     inscritos: int
 
-# Banco de Dados em Memória (para fins do MVP leve)
 db_alunos = [
     Aluno(id=1, nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação"),
     Aluno(id=2, nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo")
@@ -35,12 +36,23 @@ db_alunos = [
 
 db_aulas = [
     Aula(id=1, nome="Spinning", vagas_maximas=15, inscritos=12),
-    Aula(id=2, nome="CrossFit", vagas_maximas=10, inscritos=10) # Lotada
+    Aula(id=2, nome="CrossFit", vagas_maximas=10, inscritos=10)
 ]
 
-@app.get("/")
-def home():
-    return {"message": "API do Sistema de Gerenciamento de Academia ativa!"}
+@app.post("/login")
+def fazer_login(dados: LoginData):
+    if dados.usuario == "admin" and dados.senha == "1234":
+        return {"message": "Login bem-sucedido!", "token": "fake-jwt-token-123"}
+    raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
+
+@app.get("/estatisticas")
+def estatisticas():
+    return {
+        "total_alunos": len(db_alunos),
+        "total_aulas": len(db_aulas),
+        "vagas_totais": sum(a.vagas_maximas for a in db_aulas),
+        "vagas_ocupadas": sum(a.inscritos for a in db_aulas)
+    }
 
 @app.get("/alunos", response_model=List[Aluno])
 def listar_alunos():
