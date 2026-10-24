@@ -8,15 +8,17 @@
         nav { background: #2c3e50; padding: 15px 25px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
         nav a { color: white; text-decoration: none; margin: 0 12px; font-weight: bold; }
         nav a:hover { color: #27ae60; }
-        .container { max-width: 900px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .container { max-width: 950px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .card-info { background: #ecf0f1; padding: 15px; border-radius: 6px; margin: 10px 0; }
         ul { list-style: none; padding: 0; }
-        li { background: #f9f9f9; margin: 8px 0; padding: 12px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        li { background: #f9f9f9; margin: 10px 0; padding: 15px; border-radius: 6px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
         form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #ddd; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         button { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #219653; }
+        .btn-editar { background: #2980b9; }
+        .btn-editar:hover { background: #1f618d; }
     </style>
 </head>
 <body>
@@ -28,16 +30,16 @@
     <div class="container">
         <h2 id="titulo-pagina">Gestão de Alunos</h2>
         
-        <!-- Formulário exclusivo do Admin para cadastrar novos alunos -->
+        <!-- Formulário de Cadastro -->
         <div id="painel-cadastro" style="display: none;">
             <h3>Cadastrar Novo Aluno</h3>
             <form onsubmit="cadastrarAluno(event)">
                 <div class="form-grid">
                     <input type="number" id="aluno-id" placeholder="ID (ex: 4)" required>
-                    <input type="text" id="aluno-usuario" placeholder="Login do Aluno (ex: aluno4)" required>
+                    <input type="text" id="aluno-usuario" placeholder="Login (ex: aluno4)" required>
                     <input type="text" id="aluno-nome" placeholder="Nome Completo" required>
                     <input type="email" id="aluno-email" placeholder="E-mail" required>
-                    <input type="text" id="aluno-plano" placeholder="Plano (ex: Mensal)" required>
+                    <input type="text" id="aluno-plano" placeholder="Plano" required>
                     <select id="aluno-status">
                         <option value="Quitado">Quitado</option>
                         <option value="Pendente">Pendente</option>
@@ -45,7 +47,7 @@
                 </div>
                 <button type="submit">Cadastrar Aluno</button>
             </form>
-            <h3>Lista de Alunos Cadastrados</h3>
+            <h3>Lista de Alunos e Planos Contratados</h3>
         </div>
 
         <div id="conteudo-area"></div>
@@ -60,7 +62,7 @@
         if (perfil === "admin") {
             menuNav.innerHTML = `
                 <a href="dashboard.html">Dashboard</a>
-                <a href="alunos.html">Alunos</a>
+                <a href="alunos.html">Alunos & Planos</a>
                 <a href="aulas.html">Aulas</a>
                 <a href="login.html" style="color: #e74c3c;">Sair</a>
             `;
@@ -77,15 +79,18 @@
         }
 
         async function carregarVisaoAdmin() {
-            document.getElementById("titulo-pagina").innerText = "Gerenciamento de Alunos e Situação Financeira";
+            document.getElementById("titulo-pagina").innerText = "Gerenciamento de Alunos, Planos e Pagamentos";
             const res = await fetch(`${API}/alunos`);
             const alunos = await res.json();
             
             let html = "<ul>";
             alunos.forEach(a => {
                 html += `<li>
-                    <span><b>${a.nome}</b> (${a.email}) — Plano: <b>${a.plano}</b> | Usuário: <code>${a.usuario}</code></span>
-                    <span>Status: <b style="color: ${a.status_pagamento === 'Quitado' ? 'green' : 'red'}">${a.status_pagamento}</b></span>
+                    <div>
+                        <b>${a.nome}</b> (${a.email})<br>
+                        <small>Plano: <b>${a.plano}</b> | Vencimento: ${a.vencimento_plano} | Status: <span style="color: ${a.status_pagamento === 'Quitado' ? 'green' : 'red'}; font-weight: bold;">${a.status_pagamento}</span></small>
+                    </div>
+                    <button class="btn-editar" onclick='prepararAtualizacao(${JSON.stringify(a)})'>Atualizar Dados</button>
                 </li>`;
             });
             html += "</ul>";
@@ -117,6 +122,37 @@
             } else {
                 const err = await res.json();
                 alert(err.detail);
+            }
+        }
+
+        function prepararAtualizacao(a) {
+            const novoNome = prompt("Atualizar Nome:", a.nome);
+            if (novoNome === null) return;
+            const novoEmail = prompt("Atualizar E-mail:", a.email);
+            const novoPlano = prompt("Atualizar Plano:", a.plano);
+            const novoStatus = prompt("Atualizar Situação Financeira (Quitado ou Pendente):", a.status_pagamento);
+            const novoVencimento = prompt("Atualizar Vencimento (AAAA-MM-DD):", a.vencimento_plano);
+
+            atualizarAlunoAPI(a.id, {
+                nome: novoNome,
+                email: novoEmail,
+                plano: novoPlano,
+                status_pagamento: novoStatus,
+                vencimento_plano: novoVencimento
+            });
+        }
+
+        async function atualizarAlunoAPI(id, dados) {
+            const res = await fetch(`${API}/alunos/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(dados)
+            });
+            if (res.ok) {
+                alert("Dados do aluno atualizados com sucesso!");
+                carregarVisaoAdmin();
+            } else {
+                alert("Erro ao atualizar aluno.");
             }
         }
 
