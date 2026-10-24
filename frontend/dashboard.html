@@ -4,16 +4,130 @@
     <meta charset="UTF-8">
     <title>Dashboard - Academia</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        nav { background: #2c3e50; padding: 15px 25px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
-        nav .menu a { color: white; text-decoration: none; margin: 0 12px; font-weight: bold; }
-        nav .menu a:hover { color: #27ae60; }
-        .container { max-width: 900px; margin: 30px auto; }
-        .welcome { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .cards-grid { display: flex; gap: 20px; }
-        .card { background: white; flex: 1; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
-        .card h3 { color: #2c3e50; margin-bottom: 5px; }
-        .card p { font-size: 26px; font-weight: bold; color: #27ae60; margin: 0; }
+        :root {
+            --primary: #1e293b;
+            --primary-hover: #0f172a;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #16a34a;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        nav {
+            background-color: var(--primary);
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        nav h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        nav .menu {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        nav .menu a {
+            color: #cbd5e1;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        nav .menu a:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        .welcome {
+            background-color: var(--bg-card);
+            padding: 28px 32px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent);
+        }
+
+        .welcome h2 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .welcome p {
+            color: var(--text-muted);
+            margin-bottom: 0;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h3 {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            margin-top: 0;
+        }
+
+        .card p {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--success);
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -24,8 +138,8 @@
 
     <div class="container">
         <div class="welcome">
-            <h2 id="titulo-boas-vindas" style="margin-top:0; color:#2c3e50;">Carregando...</h2>
-            <p id="sub-boas-vindas" style="color:#666; margin-bottom:0;"></p>
+            <h2 id="titulo-boas-vindas">Carregando...</h2>
+            <p id="sub-boas-vindas"></p>
         </div>
 
         <div class="cards-grid">
@@ -48,22 +162,22 @@
         const perfil = localStorage.getItem("perfil") || "aluno";
         const nome = localStorage.getItem("nomeUsuario") || "Usuário";
 
-        // Configurar Menu dinâmico baseado no perfil (Requisito de Permissões)
         const menuNav = document.getElementById("menu-nav");
         if (perfil === "admin") {
             menuNav.innerHTML = `
                 <a href="dashboard.html">Dashboard</a>
                 <a href="alunos.html">Alunos</a>
                 <a href="aulas.html">Aulas</a>
-                <a href="login.html" style="color: #e74c3c;">Sair</a>
+                <a href="login.html" style="color: #f87171;">Sair</a>
             `;
             document.getElementById("titulo-boas-vindas").innerText = `Bem-vindo, ${nome} (Administrador)`;
             document.getElementById("sub-boas-vindas").innerText = "Você possui acesso completo à gestão de cadastros, planos e controle de capacidade das turmas.";
         } else {
             menuNav.innerHTML = `
                 <a href="dashboard.html">Dashboard</a>
-                <a href="aulas.html">Ver Aulas & Inscrever-se</a>
-                <a href="login.html" style="color: #e74c3c;">Sair</a>
+                <a href="alunos.html">Meus Dados</a>
+                <a href="aulas.html">Aulas & Inscrições</a>
+                <a href="login.html" style="color: #f87171;">Sair</a>
             `;
             document.getElementById("titulo-boas-vindas").innerText = `Olá, ${nome} (Aluno)`;
             document.getElementById("sub-boas-vindas").innerText = "Consulte os horários disponíveis e faça sua inscrição nas aulas com controle de vagas em tempo real.";
