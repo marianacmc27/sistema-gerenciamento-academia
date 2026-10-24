@@ -2,59 +2,160 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Aulas - Academia</title>
+    <title>Gestão de Aulas - Academia</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        nav { background: #2c3e50; padding: 15px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
-        nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        nav { background: #2c3e50; padding: 15px 25px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; text-decoration: none; margin: 0 12px; font-weight: bold; }
         nav a:hover { color: #27ae60; }
-        .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         ul { list-style: none; padding: 0; }
-        li { background: #ecf0f1; margin: 8px 0; padding: 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-        button { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        li { background: #ecf0f1; margin: 10px 0; padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .acoes { display: flex; gap: 8px; }
+        button { background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #219653; }
-        .lotado { background: #e74c3c; cursor: not-allowed; }
+        .btn-cancelar { background: #e67e22; }
+        .btn-cancelar:hover { background: #d35400; }
+        .btn-remover { background: #e74c3c; }
+        .btn-remover:hover { background: #c0392b; }
+        .lotado { background: #95a5a6; cursor: not-allowed; }
+        form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #ddd; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
 <body>
     <nav>
         <h2>🏋️ Sistema Academia</h2>
-        <div>
-            <a href="dashboard.html">Dashboard</a>
-            <a href="alunos.html">Alunos</a>
-            <a href="aulas.html">Aulas</a>
-            <a href="login.html" style="color: #e74c3c;">Sair</a>
-        </div>
+        <div id="menu-nav"></div>
     </nav>
 
     <div class="container">
-        <h2>🏃‍♂️ Gestão de Aulas e Limite de Vagas</h2>
+        <h2 id="titulo-pagina">🏃‍♂️ Programação de Aulas</h2>
+
+        <!-- Painel exclusivo do Administrador (Gestão de Turmas) -->
+        <div id="painel-criacao" style="display: none;">
+            <h3>Cadastrar Nova Turma (Apenas Funcionário/Admin)</h3>
+            <form onsubmit="criarAula(event)">
+                <div class="form-grid">
+                    <input type="number" id="aula-id" placeholder="ID da Aula (ex: 4)" required>
+                    <input type="text" id="aula-nome" placeholder="Nome da Aula (ex: Pilates)" required>
+                    <input type="text" id="aula-prof" placeholder="Nome do Professor" required>
+                    <input type="text" id="aula-horario" placeholder="Horário (ex: Ter/Qui 15:00)" required>
+                    <input type="number" id="aula-vagas" placeholder="Vagas Máximas" required>
+                </div>
+                <button type="submit">Cadastrar Turma</button>
+            </form>
+        </div>
+
+        <h3>Turmas Disponíveis</h3>
         <ul id="lista-aulas"></ul>
     </div>
 
     <script>
         const API = "http://127.0.0.1:8000";
+        const perfil = localStorage.getItem("perfil") || "aluno";
+
+        const menuNav = document.getElementById("menu-nav");
+        if (perfil === "admin") {
+            menuNav.innerHTML = `
+                <a href="dashboard.html">Dashboard</a>
+                <a href="alunos.html">Alunos</a>
+                <a href="aulas.html">Aulas</a>
+                <a href="login.html" style="color: #e74c3c;">Sair</a>
+            `;
+            document.getElementById("painel-criacao").style.display = "block";
+        } else {
+            menuNav.innerHTML = `
+                <a href="dashboard.html">Dashboard</a>
+                <a href="alunos.html">Meus Dados</a>
+                <a href="aulas.html">Aulas & Inscrições</a>
+                <a href="login.html" style="color: #e74c3c;">Sair</a>
+            `;
+        }
 
         async function carregarAulas() {
             const res = await fetch(`${API}/aulas`);
             const aulas = await res.json();
             const ul = document.getElementById("lista-aulas");
             ul.innerHTML = "";
+
             aulas.forEach(a => {
                 const vagasRestantes = a.vagas_maximas - a.inscritos;
                 const lotado = vagasRestantes <= 0;
-                ul.innerHTML += `
-                    <li>
-                        <span><b>${a.nome}</b> — Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</span>
+
+                let botoesHTML = "";
+                if (perfil === "admin") {
+                    // Admin gerencia (remove turma), NUNCA se inscreve
+                    botoesHTML = `<button class="btn-remover" onclick="removerAula(${a.id})">Remover Turma</button>`;
+                } else {
+                    // Aluno pode se inscrever e cancelar (respeitando RN01 e RN03)
+                    botoesHTML = `
                         <button class="${lotado ? 'lotado' : ''}" ${lotado ? 'disabled' : ''} onclick="inscrever(${a.id})">
                             ${lotado ? 'Lotado' : 'Inscrever-se'}
                         </button>
+                        <button class="btn-cancelar" onclick="cancelar(${a.id})">Cancelar</button>
+                    `;
+                }
+
+                ul.innerHTML += `
+                    <li>
+                        <div>
+                            <b>${a.nome}</b> (${a.horario})<br>
+                            <small>Prof: ${a.professor} | Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</small>
+                        </div>
+                        <div class="acoes">${botoesHTML}</div>
                     </li>`;
             });
         }
 
+        async function criarAula(e) {
+            e.preventDefault();
+            const nova = {
+                id: parseInt(document.getElementById("aula-id").value),
+                nome: document.getElementById("aula-nome").value,
+                professor: document.getElementById("aula-prof").value,
+                horario: document.getElementById("aula-horario").value,
+                vagas_maximas: parseInt(document.getElementById("aula-vagas").value)
+            };
+            const res = await fetch(`${API}/aulas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(nova)
+            });
+            if (res.ok) {
+                alert("Aula cadastrada com sucesso!");
+                carregarAulas();
+                e.target.reset();
+            } else {
+                const err = await res.json();
+                alert(err.detail);
+            }
+        }
+
+        async function removerAula(id) {
+            if (confirm("Tem certeza que deseja excluir esta turma?")) {
+                const res = await fetch(`${API}/aulas/${id}`, { method: "DELETE" });
+                if (res.ok) {
+                    alert("Turma removida!");
+                    carregarAulas();
+                }
+            }
+        }
+
         async function inscrever(id) {
             const res = await fetch(`${API}/aulas/${id}/inscrever`, { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                carregarAulas();
+            } else {
+                alert(data.detail);
+            }
+        }
+
+        async function cancelar(id) {
+            const res = await fetch(`${API}/aulas/${id}/cancelar`, { method: "POST" });
             const data = await res.json();
             if (res.ok) {
                 alert(data.message);
