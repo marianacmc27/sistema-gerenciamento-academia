@@ -1,5 +1,91 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><title>Academia</title></head>
-<body><h1>MVP Academia</h1></body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gerenciamento de Academia</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        header { background: #2c3e50; color: white; padding: 20px; text-align: center; border-radius: 8px; }
+        .container { max-width: 900px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; color: #2c3e50; }
+        ul { list-style: none; padding: 0; }
+        li { background: #ecf0f1; margin: 8px 0; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        button { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #219653; }
+        .lotado { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🏋️ Sistema de Gerenciamento de Academia</h1>
+        <p>Painel de Controle do MVP - Engenharia de Software I</p>
+    </header>
+
+    <div class="container">
+        <h2>👥 Alunos Matriculados</h2>
+        <ul id="lista-alunos">
+            <p>Carregando alunos...</p>
+        </ul>
+
+        <h2>🏃‍♂️ Aulas em Grupo e Vagas</h2>
+        <ul id="lista-aulas">
+            <p>Carregando aulas...</p>
+        </ul>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        async function carregarDados() {
+            try {
+                // Carregar Alunos
+                const resAlunos = await fetch(`${API_URL}/alunos`);
+                const alunos = await resAlunos.json();
+                const ulAlunos = document.getElementById("lista-alunos");
+                ulAlunos.innerHTML = "";
+                alunos.forEach(a => {
+                    ulAlunos.innerHTML += `<li>${a.nome} (${a.email}) - <b>Plano:</b> ${a.plano}</li>`;
+                });
+
+                // Carregar Aulas
+                const resAulas = await fetch(`${API_URL}/aulas`);
+                const aulas = await resAulas.json();
+                const ulAulas = document.getElementById("lista-aulas");
+                ulAulas.innerHTML = "";
+                aulas.forEach(a => {
+                    const vagasRestantes = a.vagas_maximas - a.inscritos;
+                    const lotado = vagasRestantes <= 0;
+                    ulAulas.innerHTML += `
+                        <li>
+                            <span><b>${a.nome}</b> — Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</span>
+                            <button class="${lotado ? 'lotado' : ''}" ${lotado ? 'disabled' : ''} onclick="inscrever(${a.id})">
+                                ${lotado ? 'Lotado' : 'Inscrever-se'}
+                            </button>
+                        </li>`;
+                });
+            } catch (err) {
+                console.error("Erro ao conectar à API:", err);
+            }
+        }
+
+        async function inscrever(aulaId) {
+            try {
+                const res = await fetch(`${API_URL}/aulas/${aulaId}/inscrever`, { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    carregarDados();
+                } else {
+                    alert(data.detail);
+                }
+            } catch (err) {
+                alert("Erro ao realizar inscrição.");
+            }
+        }
+
+        carregarDados();
+    </script>
+</body>
 </html>
