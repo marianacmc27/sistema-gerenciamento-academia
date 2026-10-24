@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 
@@ -14,7 +14,8 @@ Base = declarative_base()
 inscricoes_tabela = Table(
     'inscricoes', Base.metadata,
     Column('aluno_id', Integer, ForeignKey('alunos.id'), primary_key=True),
-    Column('aula_id', Integer, ForeignKey('aulas.id'), primary_key=True)
+    Column('aula_id', Integer, ForeignKey('aulas.id'), primary_key=True),
+    Column('presenca', Boolean, default=False) # Controle de frequência / check-in
 )
 
 class AlunoDB(Base):
@@ -24,7 +25,7 @@ class AlunoDB(Base):
     nome = Column(String)
     email = Column(String, unique=True)
     plano = Column(String)
-    status_pagamento = Column(String, default="Quitado") # Quitado ou Pendente
+    status_pagamento = Column(String, default="Quitado")
     vencimento_plano = Column(String, default="2026-12-31")
     
     aulas = relationship("AulaDB", secondary=inscricoes_tabela, back_populates="alunos_inscritos")
@@ -96,24 +97,6 @@ class AtualizarAlunoSchema(BaseModel):
     status_pagamento: str
     vencimento_plano: str
 
-class PlanoSchema(BaseModel):
-    id: int
-    nome: str
-    valor: str
-    descricao: str
-    class Config:
-        from_attributes = True
-
-class AulaSchema(BaseModel):
-    id: int
-    nome: str
-    professor: str
-    horario: str
-    vagas_maximas: int
-    inscritos: int
-    class Config:
-        from_attributes = True
-
 class NovaAulaSchema(BaseModel):
     id: int
     nome: str
@@ -172,54 +155,42 @@ def estatisticas(db: Session = Depends(get_db)):
         "vagas_ocupadas": vagas_ocupadas
     }
 
-@app.get("/alunos", response_model=List[AlunoSchema])
+@app.get("/alunos")
 def listar_alunos(db: Session = Depends(get_db)):
     return db.query(AlunoDB).all()
 
-@app.post("/alunos", response_model=AlunoSchema)
+@app.post("/alunos")
 def cadastrar_aluno(aluno: NovoAlunoSchema, db: Session = Depends(get_db)):
     existente = db.query(AlunoDB).filter((AlunoDB.id == aluno.id) | (AlunoDB.usuario == aluno.usuario)).first()
     if existente:
         raise HTTPException(status_code=400, detail="ID ou usuário já cadastrado no sistema.")
-    
-    novo = AlunoDB(
-        id=aluno.id,
-        usuario=aluno.usuario,
-        nome=aluno.nome,
-        email=aluno.email,
-        plano=aluno.plano,
-        status_pagamento=aluno.status_pagamento,
-        vencimento_plano=aluno.vencimento_plano
-    )
+    novo = AlunoDB(**aluno.dict())
     db.add(novo)
     db.commit()
     db.refresh(novo)
     return novo
 
-@app.put("/alunos/{aluno_id}", response_model=AlunoSchema)
+@app.put("/alunos/{aluno_id}")
 def atualizar_aluno(aluno_id: int, dados: AtualizarAlunoSchema, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.id == aluno_id).first()
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-    
     aluno.nome = dados.nome
     aluno.email = dados.email
     aluno.plano = dados.plano
     aluno.status_pagamento = dados.status_pagamento
     aluno.vencimento_plano = dados.vencimento_plano
-    
     db.commit()
-    db.refresh(aluno)
     return aluno
 
-@app.get("/alunos/{usuario}", response_model=AlunoSchema)
+@app.get("/alunos/{usuario}")
 def consultar_aluno_especifico(usuario: str, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.usuario == usuario).first()
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno não encontrado.")
     return aluno
 
-@app.get("/planos", response_model=List[PlanoSchema])
+@app.get("/planos")
 def listar_planos(db: Session = Depends(get_db)):
     return db.query(PlanoDB).all()
 
@@ -239,16 +210,28 @@ def listar_aulas(db: Session = Depends(get_db)):
         })
     return resultado
 
-@app.post("/aulas", response_model=AulaSchema)
+@app.post("/aulas")
 def criar_aula(aula: NovaAulaSchema, db: Session = Depends(get_db)):
     existente = db.query(AulaDB).filter(AulaDB.id == aula.id).first()
     if existente:
         raise HTTPException(status_code=400, detail="ID de aula já cadastrado.")
-    nova = AulaDB(id=aula.id, nome=aula.nome, professor=aula.professor, horario=aula.horario, vagas_maximas=aula.vagas_maximas)
+    nova = AulaDB(**aula.dict())
     db.add(nova)
     db.commit()
     db.refresh(nova)
     return {"id": nova.id, "nome": nova.nome, "professor": nova.professor, "horario": nova.horario, "vagas_maximas": nova.vagas_maximas, "inscritos": 0}
+
+@app.put("/aulas/{aula_id}")
+def atualizar_aula(aula_id: int, dados: NovaAulaSchema, db: Session = Depends(get_db)):
+    aula = db.query(AulaDB).filter(AulaDB.id == aula_id).first()
+    if not aula:
+        raise HTTPException(status_code=404, detail="Aula não encontrada.")
+    aula.nome = dados.nome
+    aula.professor = dados.professor
+    aula.horario = dados.horario
+    aula.vagas_maximas = dados.vagas_maximas
+    db.commit()
+    return {"message": "Programação da aula atualizada com sucesso!"}
 
 @app.delete("/aulas/{aula_id}")
 def remover_aula(aula_id: int, db: Session = Depends(get_db)):
