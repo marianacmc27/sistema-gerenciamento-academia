@@ -4,26 +4,188 @@
     <meta charset="UTF-8">
     <title>Gestão de Aulas - Academia</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        nav { background: #2c3e50; padding: 15px 25px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
-        nav a { color: white; text-decoration: none; margin: 0 12px; font-weight: bold; }
-        nav a:hover { color: #27ae60; }
-        .container { max-width: 950px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        ul { list-style: none; padding: 0; }
-        li { background: #ecf0f1; margin: 12px 0; padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-        button { background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #219653; }
-        .btn-cancelar { background: #e67e22; }
-        .btn-cancelar:hover { background: #d35400; }
-        .btn-remover { background: #e74c3c; }
-        .btn-remover:hover { background: #c0392b; }
-        .btn-editar { background: #2980b9; }
-        .btn-editar:hover { background: #1f618d; }
-        .lotado { background: #95a5a6; cursor: not-allowed; }
-        form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #ddd; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        :root {
+            --primary: #1e293b;
+            --primary-hover: #0f172a;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #f59e0b;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #334155;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        nav {
+            background-color: var(--primary);
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        nav h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        nav div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        nav a {
+            color: #cbd5e1;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        nav a:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            background-color: var(--bg-card);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        h2, h3 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+
+        form {
+            background-color: #f8fafc;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background-color: white;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-cancelar {
+            background-color: var(--warning);
+        }
+        .btn-cancelar:hover {
+            background-color: #d97706;
+        }
+
+        .btn-remover {
+            background-color: var(--danger);
+        }
+        .btn-remover:hover {
+            background-color: #b91c1c;
+        }
+
+        .btn-editar {
+            background-color: #0284c7;
+        }
+        .btn-editar:hover {
+            background-color: #0369a1;
+        }
+
+        .lotado {
+            background-color: #94a3b8 !important;
+            cursor: not-allowed;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            background-color: white;
+            margin: 12px 0;
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            transition: box-shadow 0.2s;
+        }
+
+        li:hover {
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+
+        .acoes {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -64,7 +226,7 @@
                 <a href="dashboard.html">Dashboard</a>
                 <a href="alunos.html">Alunos</a>
                 <a href="aulas.html">Aulas</a>
-                <a href="login.html" style="color: #e74c3c;">Sair</a>
+                <a href="login.html" style="color: #f87171;">Sair</a>
             `;
             document.getElementById("painel-criacao").style.display = "block";
         } else {
@@ -72,7 +234,7 @@
                 <a href="dashboard.html">Dashboard</a>
                 <a href="alunos.html">Meus Dados</a>
                 <a href="aulas.html">Aulas & Inscrições</a>
-                <a href="login.html" style="color: #e74c3c;">Sair</a>
+                <a href="login.html" style="color: #f87171;">Sair</a>
             `;
         }
 
@@ -91,7 +253,7 @@
 
                 if (perfil === "admin") {
                     const nomesInscritos = a.lista_alunos.length > 0 ? a.lista_alunos.join(", ") : "Nenhum aluno inscrito";
-                    infoAlunosAdmin = `<br><small style="color: #2980b9;"><b>Alunos Inscritos (Frequência):</b> ${nomesInscritos}</small>`;
+                    infoAlunosAdmin = `<br><small style="color: #0284c7;"><b>Alunos Inscritos (Frequência):</b> ${nomesInscritos}</small>`;
                     botoesHTML = `
                         <button class="btn-editar" onclick='prepararAlteracao(${JSON.stringify(a)})'>Alterar Turma</button>
                         <button class="btn-remover" onclick="removerAula(${a.id})">Remover</button>
@@ -109,7 +271,7 @@
                     <li>
                         <div>
                             <b>${a.nome}</b> (${a.horario})<br>
-                            <small>Prof: ${a.professor} | Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</small>
+                            <small style="color: #64748b;">Prof: ${a.professor} | Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</small>
                             ${infoAlunosAdmin}
                         </div>
                         <div class="acoes">${botoesHTML}</div>
