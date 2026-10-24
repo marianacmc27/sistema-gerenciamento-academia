@@ -11,7 +11,6 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Tabela associativa para controlar exatamente quais alunos estão inscritos em quais aulas (RF02 / RN01)
 inscricoes_tabela = Table(
     'inscricoes', Base.metadata,
     Column('aluno_id', Integer, ForeignKey('alunos.id'), primary_key=True),
@@ -25,7 +24,7 @@ class AlunoDB(Base):
     nome = Column(String)
     email = Column(String, unique=True)
     plano = Column(String)
-    status_pagamento = Column(String, default="Quitado")
+    status_pagamento = Column(String, default="Quitado") # Quitado ou Pendente
     vencimento_plano = Column(String, default="2026-12-31")
     
     aulas = relationship("AulaDB", secondary=inscricoes_tabela, back_populates="alunos_inscritos")
@@ -42,7 +41,7 @@ class AulaDB(Base):
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Sistema de Gerenciamento de Academia - ECOT11A", version="1.0.0")
+app = FastAPI(title="Sistema de Gerenciamento de Academia", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,6 +72,15 @@ class AlunoSchema(BaseModel):
     vencimento_plano: str
     class Config:
         from_attributes = True
+
+class NovoAlunoSchema(BaseModel):
+    id: int
+    usuario: str
+    nome: str
+    email: str
+    plano: str
+    status_pagamento: str = "Quitado"
+    vencimento_plano: str = "2026-12-31"
 
 class AulaSchema(BaseModel):
     id: int
@@ -140,6 +148,26 @@ def estatisticas(db: Session = Depends(get_db)):
 def listar_alunos(db: Session = Depends(get_db)):
     return db.query(AlunoDB).all()
 
+@app.post("/alunos", response_model=AlunoSchema)
+def cadastrar_aluno(aluno: NovoAlunoSchema, db: Session = Depends(get_db)):
+    existente = db.query(AlunoDB).filter((AlunoDB.id == aluno.id) | (AlunoDB.usuario == aluno.usuario)).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="ID ou usuário já cadastrado no sistema.")
+    
+    novo = AlunoDB(
+        id=aluno.id,
+        usuario=aluno.usuario,
+        nome=aluno.nome,
+        email=aluno.email,
+        plano=aluno.plano,
+        status_pagamento=aluno.status_pagamento,
+        vencimento_plano=aluno.vencimento_plano
+    )
+    db.add(novo)
+    db.commit()
+    db.refresh(novo)
+    return novo
+
 @app.get("/alunos/{usuario}", response_model=AlunoSchema)
 def consultar_aluno_especifico(usuario: str, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.usuario == usuario).first()
@@ -159,7 +187,7 @@ def listar_aulas(db: Session = Depends(get_db)):
             "horario": a.horario,
             "vagas_maximas": a.vagas_maximas,
             "inscritos": len(a.alunos_inscritos),
-            "lista_alunos": [al.nome for al in a.alunos_inscritos] # Admin vê quem está inscrito!
+            "lista_alunos": [al.nome for al in a.alunos_inscritos]
         })
     return resultado
 
@@ -191,6 +219,10 @@ def inscrever_aula(aula_id: int, aluno_usuario: str, db: Session = Depends(get_d
     if not aula or not aluno:
         raise HTTPException(status_code=404, detail="Aula ou Aluno não encontrados.")
     
+    # Validação financeira: Aluno inadimplente não pode se inscrever
+    if aluno.status_pagamento != "Quitado":
+        raise HTTPException(status_code=400, detail="Inscrição bloqueada: O aluno possui pagamento pendente ou plano vencido.")
+    
     if aluno in aula.alunos_inscritos:
         raise HTTPException(status_code=400, detail="Você já está inscrito nesta aula!")
         
@@ -199,7 +231,7 @@ def inscrever_aula(aula_id: int, aluno_usuario: str, db: Session = Depends(get_d
         db.commit()
         return {"message": f"Inscrição realizada com sucesso na aula {aula.nome}!"}
     else:
-        raise HTTPException(status_code=400, detail="Esta turma já atingiu o limite máximo de vagas (RN01)!")
+        raise HTTPException(status_code=400, detail="Esta turma já atingiu o limite máximo de vagas!")
 
 @app.post("/aulas/{aula_id}/cancelar")
 def cancelar_inscricao(aula_id: int, aluno_usuario: str, db: Session = Depends(get_db)):
@@ -212,6 +244,6 @@ def cancelar_inscricao(aula_id: int, aluno_usuario: str, db: Session = Depends(g
     if aluno in aula.alunos_inscritos:
         aula.alunos_inscritos.remove(aluno)
         db.commit()
-        return {"message": f"Inscrição cancelada com sucesso na aula {aula.nome} (RN03)!"}
+        return {"message": f"Inscrição cancelada com sucesso na aula {aula.nome}!"}
     else:
         raise HTTPException(status_code=400, detail="Você não possui inscrição ativa nesta aula para poder cancelar.")
