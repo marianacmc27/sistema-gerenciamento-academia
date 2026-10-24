@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Alunos - Academia</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        nav { background: #2c3e50; padding: 15px; border-radius: 8px; color: white; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        nav a:hover { color: #27ae60; }
+        .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        ul { list-style: none; padding: 0; }
+        li { background: #ecf0f1; margin: 8px 0; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; }
+        form { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { padding: 8px; flex: 1; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <nav>
+        <h2>🏋️ Sistema Academia</h2>
+        <div>
+            <a href="dashboard.html">Dashboard</a>
+            <a href="alunos.html">Alunos</a>
+            <a href="aulas.html">Aulas</a>
+            <a href="login.html" style="color: #e74c3c;">Sair</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>👥 Cadastro e Gestão de Alunos</h2>
+        <form onsubmit="cadastrarAluno(event)">
+            <input type="number" id="id" placeholder="ID (ex: 3)" required>
+            <input type="text" id="nome" placeholder="Nome Completo" required>
+            <input type="email" id="email" placeholder="E-mail" required>
+            <input type="text" id="plano" placeholder="Plano" required>
+            <button type="submit">Cadastrar</button>
+        </form>
+
+        <h3>Lista de Alunos</h3>
+        <ul id="lista-alunos"></ul>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+
+        async function carregarAlunos() {
+            const res = await fetch(`${API}/alunos`);
+            const alunos = await res.json();
+            const ul = document.getElementById("lista-alunos");
+            ul.innerHTML = "";
+            alunos.forEach(a => {
+                ul.innerHTML += `<li><span><b>${a.nome}</b> (${a.email})</span> <span>Plano: ${a.plano}</span></li>`;
+            });
+        }
+
+        async function cadastrarAluno(e) {
+            e.preventDefault();
+            const novo = {
+                id: parseInt(document.getElementById("id").value),
+                nome: document.getElementById("nome").value,
+                email: document.getElementById("email").value,
+                plano: document.getElementById("plano").value
+            };
+            const res = await fetch(`${API}/alunos`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(novo)
+            });
+            if (res.ok) {
+                alert("Aluno cadastrado com sucesso!");
+                carregarAlunos();
+                e.target.reset();
+            } else {
+                alert("Erro ao cadastrar aluno (ID repetido?).");
+            }
+        }
+
+        carregarAlunos();
+    </script>
+</body>
+</html>
