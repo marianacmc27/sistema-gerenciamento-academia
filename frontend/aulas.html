@@ -33,9 +33,8 @@
     <div class="container">
         <h2 id="titulo-pagina">🏃‍♂️ Programação de Aulas</h2>
 
-        <!-- Painel exclusivo do Administrador (Gestão de Turmas) -->
         <div id="painel-criacao" style="display: none;">
-            <h3>Cadastrar Nova Turma (Apenas Funcionário/Admin)</h3>
+            <h3>Cadastrar Nova Turma (Funcionário/Admin)</h3>
             <form onsubmit="criarAula(event)">
                 <div class="form-grid">
                     <input type="number" id="aula-id" placeholder="ID da Aula (ex: 4)" required>
@@ -55,6 +54,7 @@
     <script>
         const API = "http://127.0.0.1:8000";
         const perfil = localStorage.getItem("perfil") || "aluno";
+        const usuarioLogado = localStorage.getItem("usuarioLogado") || "aluno1";
 
         const menuNav = document.getElementById("menu-nav");
         if (perfil === "admin") {
@@ -84,12 +84,15 @@
                 const vagasRestantes = a.vagas_maximas - a.inscritos;
                 const lotado = vagasRestantes <= 0;
 
+                let infoAlunosAdmin = "";
                 let botoesHTML = "";
+
                 if (perfil === "admin") {
-                    // Admin gerencia (remove turma), NUNCA se inscreve
+                    // Admin visualiza quem está inscrito na turma
+                    const nomesInscritos = a.lista_alunos.length > 0 ? a.lista_alunos.join(", ") : "Nenhum aluno inscrito";
+                    infoAlunosAdmin = `<br><small style="color: #2980b9;"><b>Alunos inscritos:</b> ${nomesInscritos}</small>`;
                     botoesHTML = `<button class="btn-remover" onclick="removerAula(${a.id})">Remover Turma</button>`;
                 } else {
-                    // Aluno pode se inscrever e cancelar (respeitando RN01 e RN03)
                     botoesHTML = `
                         <button class="${lotado ? 'lotado' : ''}" ${lotado ? 'disabled' : ''} onclick="inscrever(${a.id})">
                             ${lotado ? 'Lotado' : 'Inscrever-se'}
@@ -103,6 +106,7 @@
                         <div>
                             <b>${a.nome}</b> (${a.horario})<br>
                             <small>Prof: ${a.professor} | Vagas: ${a.inscritos}/${a.vagas_maximas} (${vagasRestantes} livres)</small>
+                            ${infoAlunosAdmin}
                         </div>
                         <div class="acoes">${botoesHTML}</div>
                     </li>`;
@@ -144,7 +148,7 @@
         }
 
         async function inscrever(id) {
-            const res = await fetch(`${API}/aulas/${id}/inscrever`, { method: "POST" });
+            const res = await fetch(`${API}/aulas/${id}/inscrever?aluno_usuario=${usuarioLogado}`, { method: "POST" });
             const data = await res.json();
             if (res.ok) {
                 alert(data.message);
@@ -155,7 +159,7 @@
         }
 
         async function cancelar(id) {
-            const res = await fetch(`${API}/aulas/${id}/cancelar`, { method: "POST" });
+            const res = await fetch(`${API}/aulas/${id}/cancelar?aluno_usuario=${usuarioLogado}`, { method: "POST" });
             const data = await res.json();
             if (res.ok) {
                 alert(data.message);
