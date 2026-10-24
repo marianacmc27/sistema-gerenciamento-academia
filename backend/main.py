@@ -2,6 +2,189 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///./academia.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class AlunoDB(Base):
+    __tablename__ = "alunos"
+    id = Column(Integer, primary_key=True, index=True)
+    usuario = Column(String, unique=True, index=True) # ex: aluno1
+    nome = Column(String)
+    email = Column(String, unique=True)
+    plano = Column(String)
+    status_pagamento = Column(String, default="Quitado") # Quitado ou Pendente
+    vencimento_plano = Column(String, default="2026-12-31")
+
+class AulaDB(Base):
+    __tablename__ = "aulas"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, index=True)
+    professor = Column(String)
+    horario = Column(String)
+    vagas_maximas = Column(Integer)
+    inscritos = Column(Integer, default=0)
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Sistema de Gerenciamento de Academia - ECOT11A", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+class LoginRequest(BaseModel):
+    usuario: str
+    senha: str
+
+class AlunoSchema(BaseModel):
+    id: int
+    usuario: str
+    nome: str
+    email: str
+    plano: str
+    status_pagamento: str
+    vencimento_plano: str
+    class Config:
+        from_attributes = True
+
+class AulaSchema(BaseModel):
+    id: int
+    nome: str
+    professor: str
+    horario: str
+    vagas_maximas: int
+    inscritos: int
+    class Config:
+        from_attributes = True
+
+class NovaAulaSchema(BaseModel):
+    id: int
+    nome: str
+    professor: str
+    horario: str
+    vagas_maximas: int
+
+def popular_dados_iniciais():
+    db = SessionLocal()
+    if db.query(AlunoDB).count() == 0:
+        db.add_all([
+            AlunoDB(id=1, usuario="aluno1", nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação", status_pagamento="Quitado", vencimento_plano="2026-06-30"),
+            AlunoDB(id=2, usuario="aluno2", nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo", status_pagamento="Pendente", vencimento_plano="2025-12-01"),
+            AlunoDB(id=3, usuario="aluno3", nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross", status_pagamento="Quitado", vencimento_plano="2026-11-15")
+        ])
+    if db.query(AulaDB).count() == 0:
+        db.add_all([
+            AulaDB(id=1, nome="Spinning", professor="Prof. Marcos", horario="Seg/Qua 08:00", vagas_maximas=15, inscritos=12),
+            AulaDB(id=2, nome="CrossFit", professor="Profª. Julia", horario="Ter/Qui 10:00", vagas_maximas=10, inscritos=10),
+            AulaDB(id=3, nome="Musculação Avançada", professor="Prof. Carlos", horario="Seg a Sex 14:00", vagas_maximas=25, inscritos=18)
+        ])
+    db.commit()
+    db.close()
+
+popular_dados_iniciais()
+
+@app.post("/login")
+def fazer_login(dados: LoginRequest, db: Session = Depends(get_db)):
+    if dados.usuario == "admin" and dados.senha == "1234":
+        return {"perfil": "admin", "nome": "Administrador / Funcionário", "usuario": "admin"}
+    
+    aluno = db.query(AlunoDB).filter(AlunoDB.usuario == dados.usuario).first()
+    if aluno and dados.senha == "1234":
+        return {"perfil": "aluno", "nome": aluno.nome, "usuario": aluno.usuario, "id": aluno.id}
+    
+    raise HTTPException(status_code=401, detail="Usuário ou senha inválidos. (Use admin/1234 ou aluno1/1234)")
+
+@app.get("/estatisticas")
+def estatisticas(db: Session = Depends(get_db)):
+    alunos = db.query(AlunoDB).all()
+    aulas = db.query(AulaDB).all()
+    pendentes = sum(1 for a in alunos if a.status_pagamento == "Pendente")
+    return {
+        "total_alunos": len(alunos),
+        "total_aulas": len(aulas),
+        "pagamentos_pendentes": pendentes,
+        "vagas_totais": sum(a.vagas_maximas for a in aulas),
+        "vagas_ocupadas": sum(a.inscritos for a in aulas)
+    }
+
+@app.get("/alunos", response_model=List[AlunoSchema])
+def listar_alunos(db: Session = Depends(get_db)):
+    return db.query(AlunoDB).all()
+
+@app.get("/alunos/{usuario}", response_model=AlunoSchema)
+def consultar_aluno_especifico(usuario: str, db: Session = Depends(get_db)):
+    aluno = db.query(AlunoDB).filter(AlunoDB.usuario == usuario).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    return aluno
+
+@app.get("/aulas", response_model=List[AulaSchema])
+def listar_aulas(db: Session = Depends(get_db)):
+    return db.query(AulaDB).all()
+
+@app.post("/aulas", response_model=AulaSchema)
+def criar_aula(aula: NovaAulaSchema, db: Session = Depends(get_db)):
+    existente = db.query(AulaDB).filter(AulaDB.id == aula.id).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="ID de aula já cadastrado.")
+    nova = AulaDB(id=aula.id, nome=aula.nome, professor=aula.professor, horario=aula.horario, vagas_maximas=aula.vagas_maximas, inscritos=0)
+    db.add(nova)
+    db.commit()
+    db.refresh(nova)
+    return nova
+
+@app.delete("/aulas/{aula_id}")
+def remover_aula(aula_id: int, db: Session = Depends(get_db)):
+    aula = db.query(AulaDB).filter(AulaDB.id == aula_id).first()
+    if not aula:
+        raise HTTPException(status_code=404, detail="Aula não encontrada.")
+    db.delete(aula)
+    db.commit()
+    return {"message": "Aula removida com sucesso!"}
+
+@app.post("/aulas/{aula_id}/inscrever")
+def inscrever_aula(aula_id: int, db: Session = Depends(get_db)):
+    aula = db.query(AulaDB).filter(AulaDB.id == aula_id).first()
+    if not aula:
+        raise HTTPException(status_code=404, detail="Aula não encontrada.")
+    if aula.inscritos < aula.vagas_maximas:
+        aula.inscritos += 1
+        db.commit()
+        return {"message": f"Inscrição realizada com sucesso na aula {aula.nome}!"}
+    else:
+        raise HTTPException(status_code=400, detail="Esta turma já atingiu o limite máximo de vagas (RN01)!")
+
+@app.post("/aulas/{aula_id}/cancelar")
+def cancelar_inscricao(aula_id: int, db: Session = Depends(get_db)):
+    aula = db.query(AulaDB).filter(AulaDB.id == aula_id).first()
+    if not aula:
+        raise HTTPException(status_code=404, detail="Aula não encontrada.")
+    if aula.inscritos > 0:
+        aula.inscritos -= 1
+        db.commit()
+        return {"message": f"Inscrição cancelada com sucesso na aula {aula.nome} (respeitando antecedência - RN03)!"}
+    else:
+        raise HTTPException(status_code=400, detail="Não há inscrições ativas nesta aula.")from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
 from sqlalchemy import create_engine, Column, Integer, String, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
