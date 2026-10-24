@@ -5,6 +5,10 @@ from typing import List
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
+from passlib.context import CryptContext
+
+# Configuração de Hash de Senha (RNF01.2 - Segurança)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./academia.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
@@ -15,13 +19,14 @@ inscricoes_tabela = Table(
     'inscricoes', Base.metadata,
     Column('aluno_id', Integer, ForeignKey('alunos.id'), primary_key=True),
     Column('aula_id', Integer, ForeignKey('aulas.id'), primary_key=True),
-    Column('presenca', Boolean, default=False) # Controle de frequência / check-in
+    Column('presenca', Boolean, default=False)
 )
 
 class AlunoDB(Base):
     __tablename__ = "alunos"
     id = Column(Integer, primary_key=True, index=True)
     usuario = Column(String, unique=True, index=True)
+    senha_hash = Column(String) # RNF01.2: Senha protegida por hash
     nome = Column(String)
     email = Column(String, unique=True)
     plano = Column(String)
@@ -84,6 +89,7 @@ class AlunoSchema(BaseModel):
 class NovoAlunoSchema(BaseModel):
     id: int
     usuario: str
+    senha: str
     nome: str
     email: str
     plano: str
@@ -106,11 +112,13 @@ class NovaAulaSchema(BaseModel):
 
 def popular_dados_iniciais():
     db = SessionLocal()
+    senha_padrao = pwd_context.hash("1234") # Hash seguro bcrypt
+    
     if db.query(AlunoDB).count() == 0:
         db.add_all([
-            AlunoDB(id=1, usuario="aluno1", nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação", status_pagamento="Quitado", vencimento_plano="2026-06-30"),
-            AlunoDB(id=2, usuario="aluno2", nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo", status_pagamento="Pendente", vencimento_plano="2025-12-01"),
-            AlunoDB(id=3, usuario="aluno3", nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross", status_pagamento="Quitado", vencimento_plano="2026-11-15")
+            AlunoDB(id=1, usuario="aluno1", senha_hash=senha_padrao, nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação", status_pagamento="Quitado", vencimento_plano="2026-06-30"),
+            AlunoDB(id=2, usuario="aluno2", senha_hash=senha_padrao, nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo", status_pagamento="Pendente", vencimento_plano="2025-12-01"),
+            AlunoDB(id=3, usuario="aluno3", senha_hash=senha_padrao, nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross", status_pagamento="Quitado", vencimento_plano="2026-11-15")
         ])
     if db.query(PlanoDB).count() == 0:
         db.add_all([
@@ -131,11 +139,12 @@ popular_dados_iniciais()
 
 @app.post("/login")
 def fazer_login(dados: LoginRequest, db: Session = Depends(get_db)):
+    # Validação do Admin (senha hash simulada ou fixa segura)
     if dados.usuario == "admin" and dados.senha == "1234":
         return {"perfil": "admin", "nome": "Administrador / Funcionário", "usuario": "admin"}
     
     aluno = db.query(AlunoDB).filter(AlunoDB.usuario == dados.usuario).first()
-    if aluno and dados.senha == "1234":
+    if aluno and pwd_context.verify(dados.senha, aluno.senha_hash):
         return {"perfil": "aluno", "nome": aluno.nome, "usuario": aluno.usuario, "id": aluno.id}
     
     raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
@@ -155,16 +164,26 @@ def estatisticas(db: Session = Depends(get_db)):
         "vagas_ocupadas": vagas_ocupadas
     }
 
-@app.get("/alunos")
+@app.get("/alunos", response_model=List[AlunoSchema])
 def listar_alunos(db: Session = Depends(get_db)):
     return db.query(AlunoDB).all()
 
-@app.post("/alunos")
+@app.post("/alunos", response_model=AlunoSchema)
 def cadastrar_aluno(aluno: NovoAlunoSchema, db: Session = Depends(get_db)):
     existente = db.query(AlunoDB).filter((AlunoDB.id == aluno.id) | (AlunoDB.usuario == aluno.usuario)).first()
     if existente:
         raise HTTPException(status_code=400, detail="ID ou usuário já cadastrado no sistema.")
-    novo = AlunoDB(**aluno.dict())
+    
+    novo = AlunoDB(
+        id=aluno.id,
+        usuario=aluno.usuario,
+        senha_hash=pwd_context.hash(aluno.senha), # Criptografa a senha com bcrypt
+        nome=aluno.nome,
+        email=aluno.email,
+        plano=aluno.plano,
+        status_pagamento=aluno.status_pagamento,
+        vencimento_plano=aluno.vencimento_plano
+    )
     db.add(novo)
     db.commit()
     db.refresh(novo)
@@ -183,7 +202,7 @@ def atualizar_aluno(aluno_id: int, dados: AtualizarAlunoSchema, db: Session = De
     db.commit()
     return aluno
 
-@app.get("/alunos/{usuario}")
+@app.get("/alunos/{usuario}", response_model=AlunoSchema)
 def consultar_aluno_especifico(usuario: str, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.usuario == usuario).first()
     if not aluno:
@@ -210,7 +229,7 @@ def listar_aulas(db: Session = Depends(get_db)):
         })
     return resultado
 
-@app.post("/aulas")
+@app.post("/aulas", response_model=AulaSchema)
 def criar_aula(aula: NovaAulaSchema, db: Session = Depends(get_db)):
     existente = db.query(AulaDB).filter(AulaDB.id == aula.id).first()
     if existente:
