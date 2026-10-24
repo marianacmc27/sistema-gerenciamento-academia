@@ -2,23 +2,25 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from datetime import date
 
-# Configuração do Banco de Dados SQLite local
 SQLALCHEMY_DATABASE_URL = "sqlite:///./academia.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Modelos do Banco de Dados (SQLAlchemy)
+# Modelo de Aluno enriquecido conforme RF01, RN04 e RN05
 class AlunoDB(Base):
     __tablename__ = "alunos"
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     plano = Column(String)
+    status_pagamento = Column(String, default="Quitado") # Quitado ou Pendente
+    vencimento_plano = Column(String, default="2026-12-31")
 
 class AulaDB(Base):
     __tablename__ = "aulas"
@@ -41,7 +43,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Dependência de Sessão do Banco
 def get_db():
     db = SessionLocal()
     try:
@@ -49,7 +50,6 @@ def get_db():
     finally:
         db.close()
 
-# Pydantic Schemas
 class LoginRequest(BaseModel):
     usuario: str
     senha: str
@@ -59,8 +59,18 @@ class AlunoSchema(BaseModel):
     nome: str
     email: str
     plano: str
+    status_pagamento: str
+    vencimento_plano: str
     class Config:
         from_attributes = True
+
+class AlunoCriacaoSchema(BaseModel):
+    id: int
+    nome: str
+    email: str
+    plano: str
+    status_pagamento: str = "Quitado"
+    vencimento_plano: str = "2026-12-31"
 
 class AulaSchema(BaseModel):
     id: int
@@ -79,14 +89,13 @@ class NovaAulaSchema(BaseModel):
     horario: str
     vagas_maximas: int
 
-# Popular dados iniciais se o banco estiver vazio
 def popular_dados_iniciais():
     db = SessionLocal()
     if db.query(AlunoDB).count() == 0:
         db.add_all([
-            AlunoDB(id=1, nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação"),
-            AlunoDB(id=2, nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo"),
-            AlunoDB(id=3, nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross")
+            AlunoDB(id=1, nome="Ana Souza", email="ana@email.com", plano="Mensal - Musculação", status_pagamento="Quitado", vencimento_plano="2026-06-30"),
+            AlunoDB(id=2, nome="Carlos Lima", email="carlos@email.com", plano="Anual - Completo", status_pagamento="Pendente", vencimento_plano="2025-12-01"), # Plano vencido/pendente para teste
+            AlunoDB(id=3, nome="Mariana Carvalho", email="mariana@email.com", plano="Trimestral - Cross", status_pagamento="Quitado", vencimento_plano="2026-11-15")
         ])
     if db.query(AulaDB).count() == 0:
         db.add_all([
@@ -99,7 +108,6 @@ def popular_dados_iniciais():
 
 popular_dados_iniciais()
 
-# Rotas da API
 @app.post("/login")
 def fazer_login(dados: LoginRequest):
     if dados.usuario == "admin" and dados.senha == "1234":
@@ -112,9 +120,11 @@ def fazer_login(dados: LoginRequest):
 def estatisticas(db: Session = Depends(get_db)):
     alunos = db.query(AlunoDB).all()
     aulas = db.query(AulaDB).all()
+    pendentes = sum(1 for a in alunos if a.status_pagamento == "Pendente")
     return {
         "total_alunos": len(alunos),
         "total_aulas": len(aulas),
+        "pagamentos_pendentes": pendentes,
         "vagas_totais": sum(a.vagas_maximas for a in aulas),
         "vagas_ocupadas": sum(a.inscritos for a in aulas)
     }
@@ -124,11 +134,18 @@ def listar_alunos(db: Session = Depends(get_db)):
     return db.query(AlunoDB).all()
 
 @app.post("/alunos", response_model=AlunoSchema)
-def cadastrar_aluno(aluno: AlunoSchema, db: Session = Depends(get_db)):
+def cadastrar_aluno(aluno: AlunoCriacaoSchema, db: Session = Depends(get_db)):
     existente = db.query(AlunoDB).filter(AlunoDB.id == aluno.id).first()
     if existente:
         raise HTTPException(status_code=400, detail="ID de aluno já cadastrado.")
-    novo = AlunoDB(id=aluno.id, nome=aluno.nome, email=aluno.email, plano=aluno.plano)
+    novo = AlunoDB(
+        id=aluno.id,
+        nome=aluno.nome,
+        email=aluno.email,
+        plano=aluno.plano,
+        status_pagamento=aluno.status_pagamento,
+        vencimento_plano=aluno.vencimento_plano
+    )
     db.add(novo)
     db.commit()
     db.refresh(novo)
